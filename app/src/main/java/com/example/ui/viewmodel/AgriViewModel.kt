@@ -14,7 +14,10 @@ import com.example.data.entities.PlotEntity
 import com.example.data.entities.RoleEntity
 import com.example.data.entities.SnapshotEntity
 import com.example.data.entities.StageEntity
+import com.example.data.entities.TagEntity
+import com.example.data.entities.TaskEntity
 import com.example.data.gateway.DataGateway
+import com.example.util.PersianDateUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -25,6 +28,7 @@ import org.json.JSONArray
 
 sealed class AppScreen {
     object Home : AppScreen()
+    object Tasks : AppScreen() // Step 2: کارهای آینده
     object Farms : AppScreen()
     data class FarmDetail(val farmId: String) : AppScreen()
     object People : AppScreen()
@@ -88,6 +92,15 @@ class AgriViewModel(application: Application) : AndroidViewModel(application) {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     val snapshots: StateFlow<List<SnapshotEntity>> = gateway.getSnapshotsFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val allTasks: StateFlow<List<TaskEntity>> = gateway.getTasksFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val pendingTasks: StateFlow<List<TaskEntity>> = gateway.getPendingTasksFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val allTags: StateFlow<List<TagEntity>> = gateway.getTagsFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // UI Feedback Message
@@ -290,6 +303,72 @@ class AgriViewModel(application: Application) : AndroidViewModel(application) {
                 _userMessage.value = result.exceptionOrNull()?.message ?: "خطا در بازگردانی فایل"
                 onComplete(false)
             }
+        }
+    }
+
+    // --- Tasks (Step 2: کارهای آینده) ---
+
+    fun saveTask(task: TaskEntity, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            gateway.saveTask(task)
+            onDone()
+        }
+    }
+
+    fun markTaskCompleted(taskId: String) {
+        viewModelScope.launch {
+            gateway.updateTaskStatus(taskId, "completed")
+            _userMessage.value = "کار با موفقیت انجام شد."
+        }
+    }
+
+    fun markTaskCancelled(taskId: String) {
+        viewModelScope.launch {
+            gateway.updateTaskStatus(taskId, "cancelled")
+            _userMessage.value = "کار لغو شد."
+        }
+    }
+
+    fun rescheduleTask(taskId: String, newDate: String) {
+        viewModelScope.launch {
+            gateway.rescheduleTask(taskId, newDate)
+            _userMessage.value = "تاریخ کار به‌روزرسانی شد."
+        }
+    }
+
+    fun deleteTask(taskId: String, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            gateway.deleteTask(taskId)
+            onDone()
+        }
+    }
+
+    // --- Tags ---
+
+    fun saveTag(tag: TagEntity, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            gateway.saveTag(tag)
+            onDone()
+        }
+    }
+
+    fun deleteTag(tagId: String, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            gateway.deleteTag(tagId)
+            onDone()
+        }
+    }
+
+    fun toggleModule(moduleKey: String) {
+        val current = settings.value ?: return
+        viewModelScope.launch {
+            val enabledModules = parseJsonStringList(current.enabledModulesJson).toMutableList()
+            if (enabledModules.contains(moduleKey)) {
+                enabledModules.remove(moduleKey)
+            } else {
+                enabledModules.add(moduleKey)
+            }
+            gateway.saveSettings(current.copy(enabledModulesJson = JSONArray(enabledModules).toString()))
         }
     }
 

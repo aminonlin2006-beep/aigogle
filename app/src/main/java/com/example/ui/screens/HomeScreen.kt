@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.DashboardCustomize
+import androidx.compose.material.icons.filled.EventNote
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Label
@@ -87,6 +88,7 @@ fun HomeScreen(
     val farms by viewModel.farms.collectAsState()
     val people by viewModel.people.collectAsState()
     val stages by viewModel.stages.collectAsState()
+    val pendingTasks by viewModel.pendingTasks.collectAsState()
 
     val unsentCount = meta?.unsentChanges ?: 0
     var reminderDismissed by remember { mutableStateOf(false) }
@@ -95,16 +97,31 @@ fun HomeScreen(
     val todayJalali = remember { PersianDateUtils.today().toLongFormat() }
 
     // Tile keys
-    val allTileKeys = listOf("farms", "people", "tags")
+    val allTileKeys = listOf("tasks", "farms", "people", "tags")
     val savedOrder = remember(deviceSettings?.tileLayoutJson) {
-        val list = viewModel.parseJsonStringList(deviceSettings?.tileLayoutJson ?: "")
-        if (list.isEmpty()) allTileKeys else list
+        val list = viewModel.parseJsonStringList(deviceSettings?.tileLayoutJson ?: "").toMutableList()
+        if (list.isEmpty()) {
+            allTileKeys
+        } else {
+            allTileKeys.forEach { key ->
+                if (!list.contains(key)) list.add(0, key)
+            }
+            list
+        }
     }
     val hiddenTiles = remember(deviceSettings?.hiddenTilesJson) {
         viewModel.parseJsonStringList(deviceSettings?.hiddenTilesJson ?: "").toSet()
     }
 
     val tileInfoMap = mapOf(
+        "tasks" to TileInfo(
+            key = "tasks",
+            title = "کارهای آینده",
+            subtitle = if (pendingTasks.isEmpty()) "هیچ کار در انتظاری نیست" else "${PersianNumberFormatter.formatInteger(pendingTasks.size.toLong())} کار در انتظار",
+            icon = Icons.Default.EventNote,
+            screen = AppScreen.Tasks,
+            count = pendingTasks.size
+        ),
         "farms" to TileInfo(
             key = "farms",
             title = "مزرعه‌ها",

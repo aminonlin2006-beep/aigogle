@@ -20,6 +20,7 @@ import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.PeopleScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.TagsScreen
+import com.example.ui.screens.TasksScreen
 import com.example.ui.theme.AgriManagerTheme
 import com.example.ui.viewmodel.AgriViewModel
 import com.example.ui.viewmodel.AppScreen
@@ -52,6 +53,7 @@ class MainActivity : ComponentActivity() {
                 ) {
                     when (val screen = currentScreen) {
                         is AppScreen.Home -> HomeScreen(viewModel = viewModel)
+                        is AppScreen.Tasks -> TasksScreen(viewModel = viewModel)
                         is AppScreen.Farms -> FarmsScreen(viewModel = viewModel)
                         is AppScreen.FarmDetail -> FarmDetailScreen(farmId = screen.farmId, viewModel = viewModel)
                         is AppScreen.People -> PeopleScreen(viewModel = viewModel)

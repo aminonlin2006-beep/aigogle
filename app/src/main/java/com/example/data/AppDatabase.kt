@@ -28,7 +28,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import com.example.data.dao.TagDao
+import com.example.data.dao.TaskDao
 import com.example.data.entities.TagEntity
+import com.example.data.entities.TaskEntity
 import java.util.UUID
 
 @Database(
@@ -43,9 +45,10 @@ import java.util.UUID
         DeviceSettingsEntity::class,
         SnapshotEntity::class,
         MetaEntity::class,
-        TagEntity::class
+        TagEntity::class,
+        TaskEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @androidx.room.TypeConverters(com.example.data.converters.AppTypeConverters::class)
@@ -61,6 +64,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun snapshotDao(): SnapshotDao
     abstract fun metaDao(): MetaDao
     abstract fun tagDao(): TagDao
+    abstract fun taskDao(): TaskDao
 
     companion object {
         @Volatile

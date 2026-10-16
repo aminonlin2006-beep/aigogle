@@ -11,6 +11,8 @@ import com.example.data.entities.PlotEntity
 import com.example.data.entities.RoleEntity
 import com.example.data.entities.SnapshotEntity
 import com.example.data.entities.StageEntity
+import com.example.data.entities.TagEntity
+import com.example.data.entities.TaskEntity
 import com.example.util.PersianDateUtils
 import kotlinx.coroutines.flow.Flow
 import org.json.JSONArray
@@ -28,6 +30,8 @@ class DataGateway(private val db: AppDatabase) {
     private val settingsDao = db.settingsDao()
     private val snapshotDao = db.snapshotDao()
     private val metaDao = db.metaDao()
+    private val taskDao = db.taskDao()
+    private val tagDao = db.tagDao()
 
     // ----------------------------------------------------
     // INITIALIZATION & DAILY SNAPSHOT
@@ -377,6 +381,75 @@ class DataGateway(private val db: AppDatabase) {
     }
 
     // ----------------------------------------------------
+    // TASKS (STEP 2: کارهای آینده)
+    // ----------------------------------------------------
+
+    fun getTasksFlow(): Flow<List<TaskEntity>> = taskDao.getAllTasks()
+
+    fun getTasksForDateFlow(date: String): Flow<List<TaskEntity>> = taskDao.getTasksForDate(date)
+
+    fun getPendingTasksFlow(): Flow<List<TaskEntity>> = taskDao.getPendingTasks()
+
+    fun getOverdueTasksFlow(todayDate: String): Flow<List<TaskEntity>> = taskDao.getOverdueTasks(todayDate)
+
+    fun getTaskByIdFlow(id: String): Flow<TaskEntity?> = taskDao.getTaskById(id)
+
+    suspend fun saveTask(task: TaskEntity): String {
+        val now = System.currentTimeMillis()
+        val isNew = taskDao.getAllTasksIncludingDeleted().none { it.id == task.id }
+        if (isNew) {
+            taskDao.insert(task.copy(createdAt = now, updatedAt = now))
+        } else {
+            taskDao.update(task.copy(updatedAt = now))
+        }
+        incrementUnsentChanges()
+        return task.id
+    }
+
+    suspend fun updateTaskStatus(taskId: String, status: String) {
+        val completedAt = if (status == "completed") System.currentTimeMillis() else null
+        taskDao.updateStatus(taskId, status, completedAt)
+        incrementUnsentChanges()
+    }
+
+    suspend fun rescheduleTask(taskId: String, newDate: String) {
+        taskDao.rescheduleTask(taskId, newDate)
+        incrementUnsentChanges()
+    }
+
+    suspend fun deleteTask(taskId: String) {
+        taskDao.softDeleteTask(taskId)
+        incrementUnsentChanges()
+    }
+
+    // ----------------------------------------------------
+    // TAGS
+    // ----------------------------------------------------
+
+    fun getTagsFlow(): Flow<List<TagEntity>> = tagDao.getAllTags()
+
+    fun getTagsForTargetFlow(targetType: String): Flow<List<TagEntity>> = tagDao.getTagsForTarget(targetType)
+
+    fun getTagByIdFlow(id: String): Flow<TagEntity?> = tagDao.getTagById(id)
+
+    suspend fun saveTag(tag: TagEntity): String {
+        val now = System.currentTimeMillis()
+        val existing = tagDao.getAllTagsIncludingDeleted().find { it.id == tag.id }
+        if (existing == null) {
+            tagDao.insert(tag.copy(createdAt = now, updatedAt = now))
+        } else {
+            tagDao.update(tag.copy(updatedAt = now))
+        }
+        incrementUnsentChanges()
+        return tag.id
+    }
+
+    suspend fun deleteTag(tagId: String) {
+        tagDao.softDeleteTag(tagId)
+        incrementUnsentChanges()
+    }
+
+    // ----------------------------------------------------
     // BACKUP & RESTORE
     // ----------------------------------------------------
 
@@ -505,10 +578,58 @@ class DataGateway(private val db: AppDatabase) {
         }
         root.put("activities", activitiesArray)
 
+        // Tasks (Step 2: کارهای آینده)
+        val tasks = taskDao.getAllTasksIncludingDeleted()
+        val tasksArray = JSONArray()
+        for (t in tasks) {
+            val obj = JSONObject().apply {
+                put("id", t.id)
+                put("title", t.title)
+                t.farmId?.let { put("farmId", it) }
+                t.plotId?.let { put("plotId", it) }
+                put("date", t.date)
+                put("priority", t.priority)
+                put("status", t.status)
+                put("assignedPersonIdsJson", t.assignedPersonIdsJson)
+                t.stageId?.let { put("stageId", it) }
+                t.activityId?.let { put("activityId", it) }
+                t.manDays?.let { put("manDays", it) }
+                t.personCount?.let { put("personCount", it) }
+                put("note", t.note)
+                t.completedAt?.let { put("completedAt", it) }
+                put("createdAt", t.createdAt)
+                put("updatedAt", t.updatedAt)
+                put("createdBy", t.createdBy)
+                put("deleted", t.deleted)
+            }
+            tasksArray.put(obj)
+        }
+        root.put("tasks", tasksArray)
+
+        // Tags
+        val tags = tagDao.getAllTagsIncludingDeleted()
+        val tagsArray = JSONArray()
+        for (t in tags) {
+            val obj = JSONObject().apply {
+                put("id", t.id)
+                put("name", t.name)
+                put("color", t.color)
+                put("targetType", t.targetType)
+                put("note", t.note)
+                put("createdAt", t.createdAt)
+                put("updatedAt", t.updatedAt)
+                put("createdBy", t.createdBy)
+                put("deleted", t.deleted)
+            }
+            tagsArray.put(obj)
+        }
+        root.put("tags", tagsArray)
+
         // Settings
         val settings = settingsDao.getSettingsSync() ?: AppSettingsEntity()
         val settingsObj = JSONObject().apply {
             put("enabledWorkTypesJson", settings.enabledWorkTypesJson)
+            put("enabledModulesJson", settings.enabledModulesJson)
             put("workMode", settings.workMode)
             put("guideDismissed", settings.guideDismissed)
         }
@@ -663,12 +784,64 @@ class DataGateway(private val db: AppDatabase) {
                 }
             }
 
+            val newTasks = mutableListOf<TaskEntity>()
+            if (root.has("tasks")) {
+                val taskArr = root.getJSONArray("tasks")
+                for (i in 0 until taskArr.length()) {
+                    val o = taskArr.getJSONObject(i)
+                    newTasks.add(
+                        TaskEntity(
+                            id = o.getString("id"),
+                            title = o.getString("title"),
+                            farmId = if (o.has("farmId") && !o.isNull("farmId")) o.getString("farmId") else null,
+                            plotId = if (o.has("plotId") && !o.isNull("plotId")) o.getString("plotId") else null,
+                            date = o.optString("date", PersianDateUtils.today().toKey()),
+                            priority = o.optString("priority", "normal"),
+                            status = o.optString("status", "pending"),
+                            assignedPersonIdsJson = o.optString("assignedPersonIdsJson", "[]"),
+                            stageId = if (o.has("stageId") && !o.isNull("stageId")) o.getString("stageId") else null,
+                            activityId = if (o.has("activityId") && !o.isNull("activityId")) o.getString("activityId") else null,
+                            manDays = if (o.has("manDays") && !o.isNull("manDays")) o.getDouble("manDays") else null,
+                            personCount = if (o.has("personCount") && !o.isNull("personCount")) o.getInt("personCount") else null,
+                            note = o.optString("note", ""),
+                            completedAt = if (o.has("completedAt") && !o.isNull("completedAt")) o.getLong("completedAt") else null,
+                            createdAt = o.optLong("createdAt", System.currentTimeMillis()),
+                            updatedAt = o.optLong("updatedAt", System.currentTimeMillis()),
+                            createdBy = o.optString("createdBy", "owner"),
+                            deleted = o.optBoolean("deleted", false)
+                        )
+                    )
+                }
+            }
+
+            val newTags = mutableListOf<TagEntity>()
+            if (root.has("tags")) {
+                val tagArr = root.getJSONArray("tags")
+                for (i in 0 until tagArr.length()) {
+                    val o = tagArr.getJSONObject(i)
+                    newTags.add(
+                        TagEntity(
+                            id = o.getString("id"),
+                            name = o.getString("name"),
+                            color = if (o.has("color") && !o.isNull("color")) o.optLong("color", 0xFF2E7D32) else 0xFF2E7D32,
+                            targetType = o.optString("targetType", "all"),
+                            note = o.optString("note", ""),
+                            createdAt = o.optLong("createdAt", System.currentTimeMillis()),
+                            updatedAt = o.optLong("updatedAt", System.currentTimeMillis()),
+                            createdBy = o.optString("createdBy", "owner"),
+                            deleted = o.optBoolean("deleted", false)
+                        )
+                    )
+                }
+            }
+
             var newSettings = AppSettingsEntity()
             if (root.has("settings")) {
                 val s = root.getJSONObject("settings")
                 newSettings = AppSettingsEntity(
                     id = 1,
                     enabledWorkTypesJson = s.optString("enabledWorkTypesJson", "[\"farming\",\"nursery\"]"),
+                    enabledModulesJson = s.optString("enabledModulesJson", "[\"tasks\"]"),
                     workMode = s.optString("workMode", "local"),
                     guideDismissed = s.optBoolean("guideDismissed", true)
                 )
@@ -692,6 +865,12 @@ class DataGateway(private val db: AppDatabase) {
 
             activityDao.clearTable()
             activityDao.insertAll(newActivities)
+
+            taskDao.clearTable()
+            taskDao.insertAll(newTasks)
+
+            tagDao.clearTable()
+            tagDao.insertAll(newTags)
 
             settingsDao.clearTable()
             settingsDao.insertOrUpdate(newSettings)

@@ -10,6 +10,7 @@ typealias Plot = PlotEntity
 typealias Person = PersonEntity
 typealias Role = RoleEntity
 typealias Tag = TagEntity
+typealias Task = TaskEntity
 
 @Entity(
     tableName = "tags",
@@ -158,9 +159,49 @@ data class ActivityEntity(
 data class AppSettingsEntity(
     @PrimaryKey val id: Int = 1,
     val enabledWorkTypesJson: String = "[\"farming\",\"nursery\"]",
+    val enabledModulesJson: String = "[\"tasks\"]", // Step 2: tasks module (Decision 159)
     val workMode: String = "local",
     val guideDismissed: Boolean = false
 )
+
+@Entity(
+    tableName = "tasks",
+    indices = [
+        Index("deleted"),
+        Index("date"),
+        Index("status"),
+        Index("priority"),
+        Index("farmId")
+    ]
+)
+data class TaskEntity(
+    @PrimaryKey val id: String = UUID.randomUUID().toString(),
+    val title: String,
+    val farmId: String? = null,
+    val plotId: String? = null,
+    val date: String, // Jalali date key e.g. "1405-07-24"
+    val priority: String = "normal", // "urgent" (فوری), "important" (مهم), "normal" (عادی)
+    val status: String = "pending", // "pending" (در انتظار), "completed" (انجام شد), "cancelled" (لغو شد)
+    val assignedPersonIdsJson: String = "[]",
+    val stageId: String? = null,
+    val activityId: String? = null,
+    val manDays: Double? = null, // حجم کار به نفرروز (Decision 55)
+    val personCount: Int? = null, // تعداد نفر
+    val note: String = "",
+    val completedAt: Long? = null,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis(),
+    val createdBy: String = "owner",
+    val deleted: Boolean = false
+) {
+    val estimatedDays: Double?
+        get() {
+            if (manDays != null && personCount != null && personCount > 0) {
+                return manDays / personCount
+            }
+            return null
+        }
+}
 
 @Entity(tableName = "device_settings")
 data class DeviceSettingsEntity(

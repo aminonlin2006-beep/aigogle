@@ -278,3 +278,46 @@ interface TagDao {
     suspend fun clearTable()
 }
 
+@Dao
+interface TaskDao {
+    @Query("SELECT * FROM tasks WHERE deleted = 0 ORDER BY date ASC, priority DESC, createdAt ASC")
+    fun getAllTasks(): Flow<List<com.example.data.entities.TaskEntity>>
+
+    @Query("SELECT * FROM tasks WHERE deleted = 0 AND date = :date ORDER BY status ASC, priority DESC, createdAt ASC")
+    fun getTasksForDate(date: String): Flow<List<com.example.data.entities.TaskEntity>>
+
+    @Query("SELECT * FROM tasks WHERE deleted = 0 AND status = 'pending' ORDER BY date ASC, priority DESC")
+    fun getPendingTasks(): Flow<List<com.example.data.entities.TaskEntity>>
+
+    @Query("SELECT * FROM tasks WHERE deleted = 0 AND status = 'pending' AND date < :todayDate ORDER BY date ASC")
+    fun getOverdueTasks(todayDate: String): Flow<List<com.example.data.entities.TaskEntity>>
+
+    @Query("SELECT * FROM tasks WHERE id = :id AND deleted = 0")
+    fun getTaskById(id: String): Flow<com.example.data.entities.TaskEntity?>
+
+    @Query("SELECT * FROM tasks")
+    suspend fun getAllTasksIncludingDeleted(): List<com.example.data.entities.TaskEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(task: com.example.data.entities.TaskEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(tasks: List<com.example.data.entities.TaskEntity>)
+
+    @Update
+    suspend fun update(task: com.example.data.entities.TaskEntity)
+
+    @Query("UPDATE tasks SET status = :status, completedAt = :completedAt, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun updateStatus(id: String, status: String, completedAt: Long?, updatedAt: Long = System.currentTimeMillis())
+
+    @Query("UPDATE tasks SET date = :newDate, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun rescheduleTask(id: String, newDate: String, updatedAt: Long = System.currentTimeMillis())
+
+    @Query("UPDATE tasks SET deleted = 1, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun softDeleteTask(id: String, updatedAt: Long = System.currentTimeMillis())
+
+    @Query("DELETE FROM tasks")
+    suspend fun clearTable()
+}
+
+
