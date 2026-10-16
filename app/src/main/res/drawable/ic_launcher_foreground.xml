@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Soil Furrows / Hills -->
+    <path
+        android:fillColor="#C8E6C9"
+        android:pathData="M24,78 C34,70 50,70 60,78 C70,86 86,84 94,76 L94,84 C84,92 68,90 58,82 C48,74 34,76 24,84 Z" />
+    <path
+        android:fillColor="#E8F5E9"
+        android:pathData="M18,84 C28,76 44,76 54,84 C64,92 80,90 90,82 L90,88 C80,96 64,96 54,88 C44,80 28,82 18,90 Z" />
+
+    <!-- Sprout Stem -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M51,76 L51,46 C51,44.9 51.9,44 53,44 L55,44 C56.1,44 57,44.9 57,46 L57,76 C57,77.1 56.1,78 55,78 L53,78 C51.9,78 51,77.1 51,76 Z" />
+
+    <!-- Left Leaf -->
+    <path
+        android:fillColor="#A5D6A7"
+        android:pathData="M52,54 C38,54 30,42 34,30 C46,30 54,38 54,52 Z" />
+
+    <!-- Right Leaf -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M56,48 C70,48 78,36 74,24 C62,24 54,32 54,46 Z" />
+</vector>

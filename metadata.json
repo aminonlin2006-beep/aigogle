@@ -1,0 +1,6 @@
+{
+  "name": "مدیریت کشاورزی",
+  "description": "سامانه مدیریت زراعت و نهالستان - گام اول هسته (مزرعه و قطعه، اشخاص و نقش‌ها، برچسب‌ها، تنظیمات و پشتیبان‌گیری)",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
